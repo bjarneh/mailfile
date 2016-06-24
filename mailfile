@@ -1,0 +1,190 @@
+#!/bin/bash
+#
+# Copyright 2016 bjarneh@ifi.uio.no. All rights reserved. 
+# Use of this source code is governed by a BSD-style 
+# license that can be found in the LICENSE file. 
+
+
+# GLOBALS
+
+ADDR_TO="bjarne.holen@ntnu.no"
+ADDR_CC=""
+SUBJECT="mail file"
+MAILBODY="${SUBJECT}"
+ENCODING="$(locale charmap)" # Guess, don't hardcode UTF-8||ISO-8859-1
+FILENAME=''
+USESTDIN=''
+USEGPG=''
+
+
+function die() {
+    (>&2 echo "${1}")
+    exit 1
+}
+
+# Taken from Debian Developers Reference Chapter 6
+function pathfind() {
+     OLDIFS="$IFS"
+     IFS=:
+     for p in $PATH; do
+         if [ -x "$p/$*" ]; then
+             IFS="$OLDIFS"
+             return 0
+         fi
+     done
+     IFS="$OLDIFS"
+     return 1
+}
+
+
+help_menu() {
+cat <<EOHELP
+
+ mf - mail an attatchment with sendmail [or not]
+
+   usage: mf [OPTIONS] [FILE]
+
+ options:
+     -h --help : print this menu and exit
+     -t --to   : recipient (default: bjarne.holen@ntnu.no)
+     -s --sub  : subject (default: 'mail file')
+     -b --body : body of mail (default: 'mail file')
+     -e --enc  : encoding [body] (default: ${ENCODING})
+     -c --cc   : carbon copy (default: '')
+     -g --gpg  : encrypt file with GPG
+
+EOHELP
+}
+
+
+# [slightly modified]
+# http://stackoverflow.com/a/4887607
+email_attachment() {
+
+    local to="$1"
+    local cc="$2"
+    local subject="$3"
+    local body="$4"
+    local filename="$5"
+    local boundary="_====_blah_====_$(date +%Y%m%d%H%M%S)_====_"
+
+    if [ "${USEGPG}" = "OK" ]; then
+        gpg -c "${filename}"
+        filename="${filename}.gpg"
+    fi
+
+    {
+        echo "To: ${to}"
+        echo "Cc: ${cc}"
+        echo "Subject: ${subject}"
+        echo "Content-Type: multipart/mixed; boundary=\"${boundary}\""
+        echo "Mime-Version: 1.0"
+        echo ""
+        echo "This is a multi-part message in MIME format."
+        echo ""
+        echo "--${boundary}"
+        echo "Content-Type: text/plain; charset=${ENCODING}"
+        echo ""
+        echo "${body}"
+        echo ""
+        if [[ -n "${filename}" && -f "${filename}" && -r "${filename}" ]]; then
+            echo  "--${boundary}"
+            echo  "Content-Transfer-Encoding: base64"
+            echo  "Content-Type: application/octet-stream; name=${filename}"
+            echo  "Content-Disposition: attachment; filename=${filename}"
+            echo  ""
+            base64 "${filename}"
+            echo  ""
+        fi
+        if [ "${USESTDIN}" = "OK" ]; then
+            echo  "--${boundary}"
+            echo  "Content-Transfer-Encoding: base64"
+            echo  "Content-Type: application/octet-stream; name=STDIN"
+            echo  "Content-Disposition: attachment; filename=STDIN"
+            echo  ""
+            if [ "${USEGPG}" = "OK" ]; then
+                echo  "$(cat|gpg -c|base64)"
+            else
+                echo  "$(cat|base64)"
+            fi
+            echo  ""
+        fi
+        echo "--${boundary}--"
+   } | sendmail -oi -t
+
+   if [ "${USEGPG}" = "OK" -a \( -f "${filename}" \) ]; then
+       rm ${filename}
+   fi
+}
+
+
+# Basic argument parsing
+parse_argv() {
+    while [[ ${#@} > 0 ]]; do
+        case "${1}" in
+            '--help' | '-help' | '-h' | '-?')
+                help_menu && exit 0;;
+            '--to' | '-to' | '-t')
+                ADDR_TO="${2}"; shift;
+                if [ "${ADDR_TO}x" = "x" ]; then
+                    die "missing arg for option: --to"
+                fi
+                ;;
+            '--cc' | '-cc' | '-c')
+                ADDR_CC="${2}"; shift;
+                if [ "${ADDR_CC}x" = "x" ]; then
+                    die "missing arg for option: --cc"
+                fi
+                ;;
+            '--body' | '-body' | '-b')
+                MAILBODY="${2}"; shift;
+                if [ "${MAILBODY}x" = "x" ]; then
+                    die "missing arg for option: --body"
+                fi
+                ;;
+            '--enc' | '-enc' | '-e')
+                ENCODING="${2}"; shift;
+                if [ "${ENCODING}x" = "x" ]; then
+                    die "missing arg for option: --enc"
+                fi
+                ;;
+            '--sub' | '-sub' | '-s')
+                SUBJECT="${2}"; shift;
+                if [ "${SUBJECT}x" = "x" ]; then
+                    die "missing arg for option: --sub"
+                fi
+                ;;
+            '--gpg' | '-gpg' | '-g')
+                USEGPG="OK"
+                ;;
+            *) # Any non option is considered file name
+                FILENAME="${1}";;
+        esac
+        shift
+    done
+}
+
+
+# Main
+{
+    # We get input from stdin
+    [ -t 0 ] || USESTDIN='OK' && FILENAME=''
+
+    # Sanity
+    pathfind "sendmail" || die "[ERROR] could not find: sendmail in \$PATH"
+    pathfind "base64"   || die "[ERROR] could not find: base64 in \$PATH"
+
+    if [ "${USEGPG}" = "OK" ]; then
+        pathfind "gpg"   || die "[ERROR] could not find: gpg in \$PATH"
+    fi
+
+    # Argument parsing
+    parse_argv "${@}"
+
+    # Go
+    email_attachment "${ADDR_TO}"\
+                     "${ADDR_CC}"\
+                     "${SUBJECT}"\
+                     "${MAILBODY}"\
+                     "${FILENAME}"
+}
