@@ -40,13 +40,13 @@ function pathfind() {
 help_menu() {
 cat <<EOHELP
 
- mf - mail an attatchment with sendmail [or not]
+ mailfile - mail an attatchment with sendmail [or not]
 
    usage: mf [OPTIONS] [FILE]
 
  options:
      -h --help : print this menu and exit
-     -t --to   : recipient (default: bjarne.holen@ntnu.no)
+     -t --to   : recipient (default: ${ADDR_TO})
      -s --sub  : subject (default: 'mailfile')
      -b --body : body of mail (default: 'mailfile')
      -e --enc  : encoding [body] (default: ${ENCODING})
