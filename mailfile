@@ -42,7 +42,7 @@ cat <<EOHELP
 
  mailfile - mail an attatchment with sendmail [or not]
 
-   usage: mf [OPTIONS] [FILE]
+   usage: mailfile [OPTIONS] [FILE]
 
  options:
      -h --help : print this menu and exit
