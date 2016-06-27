@@ -7,14 +7,14 @@
 
 # GLOBALS
 
-ADDR_TO="bjarne.holen@ntnu.no"
+ADDR_TO="${USER}@ntnu.no"
 ADDR_CC=""
-SUBJECT="mail file"
+SUBJECT="mailfile"
 MAILBODY="${SUBJECT}"
 ENCODING="$(locale charmap)" # Guess, don't hardcode UTF-8||ISO-8859-1
-FILENAME=''
-USESTDIN=''
-USEGPG=''
+FILENAME=""
+USESTDIN=""
+USEGPG=""
 
 
 function die() {
@@ -47,8 +47,8 @@ cat <<EOHELP
  options:
      -h --help : print this menu and exit
      -t --to   : recipient (default: bjarne.holen@ntnu.no)
-     -s --sub  : subject (default: 'mail file')
-     -b --body : body of mail (default: 'mail file')
+     -s --sub  : subject (default: 'mailfile')
+     -b --body : body of mail (default: 'mailfile')
      -e --enc  : encoding [body] (default: ${ENCODING})
      -c --cc   : carbon copy (default: '')
      -g --gpg  : encrypt file with GPG
@@ -118,41 +118,70 @@ email_attachment() {
 }
 
 
+
+# Assert that required argument is given
+option_arg_check() {
+
+    local var_to_check="$1"
+    local var_name="$2"
+
+    if [ "${var_to_check}x" = "x" ]; then
+        die "missing arg for option: ${var_name}"
+    fi
+}
+
+
 # Basic argument parsing
 parse_argv() {
+    local splitme;
     while [[ ${#@} > 0 ]]; do
         case "${1}" in
             '--help' | '-help' | '-h' | '-?')
                 help_menu && exit 0;;
             '--to' | '-to' | '-t')
                 ADDR_TO="${2}"; shift;
-                if [ "${ADDR_TO}x" = "x" ]; then
-                    die "missing arg for option: --to"
-                fi
+                option_arg_check "${ADDR_TO}" "--to"
+                ;;
+            --to=* | -to=* | -t=*)
+                splitme=(${1//=/ });
+                ADDR_TO="${splitme[1]}";
+                option_arg_check "${ADDR_TO}" "--to"
                 ;;
             '--cc' | '-cc' | '-c')
                 ADDR_CC="${2}"; shift;
-                if [ "${ADDR_CC}x" = "x" ]; then
-                    die "missing arg for option: --cc"
-                fi
+                option_arg_check "${ADDR_CC}" "--cc"
+                ;;
+            --cc=* | -cc=* | -c=*)
+                splitme=(${1//=/ });
+                ADDR_CC="${splitme[1]}";
+                option_arg_check "${ADDR_CC}" "--cc"
                 ;;
             '--body' | '-body' | '-b')
                 MAILBODY="${2}"; shift;
-                if [ "${MAILBODY}x" = "x" ]; then
-                    die "missing arg for option: --body"
-                fi
+                option_arg_check "${MAILBODY}" "--body"
+                ;;
+            --body=*| -body=* | -b=*)
+                splitme=(${1//=/ });
+                MAILBODY="${splitme[1]}";
+                option_arg_check "${MAILBODY}" "--body"
                 ;;
             '--enc' | '-enc' | '-e')
                 ENCODING="${2}"; shift;
-                if [ "${ENCODING}x" = "x" ]; then
-                    die "missing arg for option: --enc"
-                fi
+                option_arg_check "${ENCODING}" "--enc"
+                ;;
+            --enc=* | -enc=* | -e=*)
+                splitme=(${1//=/ });
+                ENCODING="${splitme[1]}";
+                option_arg_check "${ENCODING}" "--enc"
                 ;;
             '--sub' | '-sub' | '-s')
                 SUBJECT="${2}"; shift;
-                if [ "${SUBJECT}x" = "x" ]; then
-                    die "missing arg for option: --sub"
-                fi
+                option_arg_check "${SUBJECT}" "--sub"
+                ;;
+            --sub=* | -sub=* | -s=*)
+                splitme=(${1//=/ });
+                SUBJECT="${splitme[1]}"
+                option_arg_check "${SUBJECT}" "--sub"
                 ;;
             '--gpg' | '-gpg' | '-g')
                 USEGPG="OK"
