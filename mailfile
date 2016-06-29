@@ -7,6 +7,7 @@
 
 # GLOBALS
 
+OK_ADDR=""
 ADDR_TO="${USER}@ntnu.no"
 ADDR_CC=""
 SUBJECT="mailfile"
@@ -141,11 +142,13 @@ parse_argv() {
             '--to' | '-to' | '-t')
                 ADDR_TO="${2}"; shift;
                 option_arg_check "${ADDR_TO}" "--to"
+                OK_ADDR="OK"
                 ;;
             --to=* | -to=* | -t=*)
                 splitme=(${1//=/ });
                 ADDR_TO="${splitme[1]}";
                 option_arg_check "${ADDR_TO}" "--to"
+                OK_ADDR="OK"
                 ;;
             '--cc' | '-cc' | '-c')
                 ADDR_CC="${2}"; shift;
@@ -209,6 +212,13 @@ parse_argv() {
 
     # Argument parsing
     parse_argv "${@}"
+
+    # Make sure we don't send mail to root@ntnu.no
+    if [ $(id -u) = "0" ]; then
+        if [ "${OK_ADDR}x" = "x" ]; then
+            die "root@ntnu.no is not your email"
+        fi
+    fi
 
     # Go
     email_attachment "${ADDR_TO}"\
